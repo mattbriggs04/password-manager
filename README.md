@@ -1,0 +1,2 @@
+# Password Manager Interface
+This program uses GPG in order to create a simple password manager with an easy-to-use interface implemented with python. Currently, it is run purely from the command line. This program intends to make it easy to add and search for passwords using gpg without having to open files, worry about secure deletion, and run the correct gpg commands correctly every time.
