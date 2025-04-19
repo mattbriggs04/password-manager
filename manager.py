@@ -2,6 +2,7 @@ import subprocess
 import json
 import getpass # gets passwords hidden
 import time
+import os
 # Could even have a file that is like a vimrc where they choose options, such as if password is optional
 settings = {}
 
@@ -9,6 +10,15 @@ def load_settings(filepath="settings.json"):
     global settings
     with open(filepath, "r") as f:
         settings = json.load(f)
+
+def secure_remove(filename: str) -> bool:
+    try:
+        subprocess.run(["srm", filename])
+        return True
+    except:
+        print("Failed to secure remove", filename)
+        return False
+    
 
 def get_entry() -> tuple[str, dict[str, str]]:
     info = {}
@@ -28,23 +38,8 @@ def get_entry() -> tuple[str, dict[str, str]]:
     }
     return site, info
 
-def secure_remove(filename: str) -> bool:
-    try:
-        subprocess.run(["srm", filename])
-        return True
-    except:
-        print("Failed to secure remove", filename)
-        return False
-    
-def create_new_file():
-    filename = input("Enter a file name (press enter to name file \"passwords.json\"): ")
-    if filename == "":
-        filename = "passwords.json"
-
-    json_dict = {}
-    entries = {}
-    entry_cont_rsp = input("Would you like to add one or more entries [y/n]? ")
-    sites = set()
+def get_entries(json_dict: dict[str, str], sites: set) -> None:
+    entry_cont_rsp = 'y'
     while entry_cont_rsp.lower() == 'y':
         site, entry = get_entry()
         if site in sites:
@@ -56,10 +51,48 @@ def create_new_file():
             json_dict[site] = entry
         entry_cont_rsp = input("\nWould you like to add another entry [y/n]? ")
 
+def create_new_file() -> None:
+    filename = input("Enter a file name (press enter to name file \"passwords.json\"): ")
+    if filename == "":
+        filename = "passwords.json"
+
+    json_dict = {}
+    entry_cont_rsp = input("Would you like to add one or more entries [y/n]? ")
+    if entry_cont_rsp.lower() == 'y':
+        sites = set()
+        get_entries(json_dict, sites)
+
     with open(filename, "w") as json_file:
         print("Populating file", filename)
         json.dump(obj=json_dict, fp=json_file, indent=4)
 
+def get_json_dict(json_file: str):
+    if os.path.exists(json_file):
+        with open(json_file, "r") as jf:
+            try:
+                json_dict = json.load(jf)
+            except:
+                json_dict = {}
+    else:
+        json_dict = {}
+    
+    return json_dict
+
+def append_to_file():
+    filename = input("Enter a file to add an entry to (press enter to name file \"passwords.json\"): ")
+    if filename == "":
+        filename = "passwords.json"
+
+    json_dict = get_json_dict(filename)
+    sites = set()
+    for k in json_dict.keys():
+        sites.add(k)
+    
+    get_entries(json_dict, sites)
+
+    with open(filename, "w") as json_file:
+        print("Populating file", filename)
+        json.dump(obj=json_dict, fp=json_file, indent=4)
 def gpg_encrypt_file(filepath, passphrase):
     command = [
         "gpg",
@@ -89,8 +122,8 @@ def print_help():
 def menu() -> bool:
     print("\n------- Password Manager Menu -------")
     print("0. Help, Settings, and Dependencies")
-    print("1. Create a new password file")
-    print("2. Add an entry to an existing file")
+    print("1. Create a new file")
+    print("2. Add entries to an existing file")
 
 
     # print("Change settings")
@@ -100,9 +133,11 @@ def menu() -> bool:
         case 0:
             print_help()
         case 1:
+            print("\n------- Create New File -------")
             create_new_file()
         case 2:
-            pass
+            print("\n------- Append To File -------")
+            append_to_file()
         case _:
             print("Quitting password manager")
             return False
