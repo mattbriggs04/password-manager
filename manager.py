@@ -78,7 +78,7 @@ def get_json_dict(json_file: str):
     
     return json_dict
 
-def append_to_file():
+def append_to_file() -> None:
     filename = input("Enter a file to add an entry to (press enter to name file \"passwords.json\"): ")
     if filename == "":
         filename = "passwords.json"
@@ -93,7 +93,29 @@ def append_to_file():
     with open(filename, "w") as json_file:
         print("Populating file", filename)
         json.dump(obj=json_dict, fp=json_file, indent=4)
+
+def get_passphrase() -> tuple[str, str]:
+    while True:
+        passphrase = getpass.getpass("\nEnter a passphrase: ")
+        confirm_passphrase = getpass.getpass("Re-enter passphrase to confirm: ")
+        if passphrase == confirm_passphrase:
+            break
+        print("Passphrases differ, retry")
+
+    while True:
+        filename = input("Enter a file to secure (press enter to select \"passwords.json\"): ")
+        if filename == "":
+            filename = "passwords.json"
+        
+        if os.path.exists(filename):
+            break
+        print("File not found, retry")
+
+    return filename, passphrase
+
 def gpg_encrypt_file(filepath, passphrase):
+
+    print("Reminder: ensure you have stored the passphrase somewhere safe (e.g. a card that you keep on yourself at all times)")
     command = [
         "gpg",
         "--batch",
@@ -105,9 +127,11 @@ def gpg_encrypt_file(filepath, passphrase):
         "-c", filepath
 
     ]
-    subprocess.run(command, ) # TODO: this command
+    subprocess.run(command, check=True)
 
-    print("File successfully encrypted, would you like to securely remove the unencrypted file [y/n]?")
+    is_srm = input("File successfully encrypted, would you like to securely remove the unencrypted file [y/n]?")
+    if is_srm.lower() == 'y':
+        secure_remove(filepath)
 
 def gpg_decrypt_file(filepath, passphrase):
     pass
@@ -116,6 +140,7 @@ def gpg_site_info(filepath, passphrase, site):
     pass # searches the file for the site, if so, returns username and password to user
 
 def print_help():
+    print("\n----- Help -----")
     print("Required package") # TODO: dependency list (secure-remove, gpg)
     print("Current settings:", settings) # print settings
 
@@ -124,11 +149,10 @@ def menu() -> bool:
     print("0. Help, Settings, and Dependencies")
     print("1. Create a new file")
     print("2. Add entries to an existing file")
+    print("3. Securely store a plaintext file")
+    print("4. Access passwords from encrypted file")
 
-
-    # print("Change settings")
-
-    user_option = int(input("Enter an option: "))
+    user_option = int(input("Enter an option (-1 to exit): "))
     match user_option:
         case 0:
             print_help()
@@ -138,6 +162,9 @@ def menu() -> bool:
         case 2:
             print("\n------- Append To File -------")
             append_to_file()
+        case 3:
+            filepath, passphrase = get_passphrase()
+            gpg_encrypt_file(filepath, passphrase)
         case _:
             print("Quitting password manager")
             return False
@@ -145,11 +172,10 @@ def menu() -> bool:
     return True
 
 if __name__ == "__main__":
-    # make a cooler load in using ASCII art for the letters
-    print("""
+    print(r"""
 _____________________________________
-  ____ ____ ____    ____ __  __ ___
- / ___|  __\   _ \   |  _ \  \/  |
+  ____ ____ ____    ___/ /__/ /__/ /___
+ / ___|  __\   _ \   |  _  \  \/  |
 | |  _| |__ | |_) |  | |_) | |\/| |
 | |_| |  __/   __/   |  __/| |  | |
  \____|_|  | _|      |_|   |_|  |_|
@@ -158,5 +184,4 @@ _/____/_/__/_/_______/_/___/_/__/_/___
 """)
     load_settings()
     while menu():
-        time.sleep(2)
-        pass
+        time.sleep(1.5)
