@@ -5,11 +5,12 @@ import getpass # gets passwords hidden
 # Could even have a file that is like a vimrc where they choose options, such as if password is optional
 settings = {}
 
-def get_settings(filepath="settings.json"):
+def load_settings(filepath="settings.json"):
+    global settings
     with open(filepath, "r") as f:
-        settings = json.load(f.read())
+        settings = json.load(f)
 
-def get_entry():
+def get_entry() -> tuple[str, dict[str, str]]:
     info = {}
     site = input("\nSite name: ")
     siteurl = input("Site url (press enter to leave blank): ")
@@ -27,6 +28,14 @@ def get_entry():
     }
     return site, info
 
+def secure_remove(filename: str) -> bool:
+    try:
+        subprocess.run(["srm", filename])
+        return True
+    except:
+        print("Failed to secure remove", filename)
+        return False
+    
 def create_new_file():
     filename = input("Enter a file name (press enter to name file \"passwords.json\"): ")
     if filename == "":
@@ -54,7 +63,7 @@ def gpg_encrypt_file(plain_filepath, encrypted_filepath):
 
 def print_help():
     print("Required package") # TODO: dependency list (secure-remove, gpg)
-    print("Current settings: ") # print settings
+    print("Current settings:", settings) # print settings
 
 def menu():
     print("\n------- Password Manager Menu -------")
@@ -78,7 +87,15 @@ def menu():
 
 if __name__ == "__main__":
     # make a cooler load in using ASCII art for the letters
-    print("/ / / / / / / / / / / / / / / / / / /")
-    print("    GPG      PASSWORD      MANAGER   ")
-    print("/ / / / / / / / / / / / / / / / / / /")
+    print("""
+_____________________________________
+  ____ ____ ____    ____ __  __ ___
+ / ___|  __\   _ \   |  _ \  \/  |
+| |  _| |__ | |_) |  | |_) | |\/| |
+| |_| |  __/   __/   |  __/| |  | |
+ \____|_|  | _|      |_|   |_|  |_|
+_/____/_/__/_/_______/_/___/_/__/_/___         
+          PASSWORD MANAGER
+""")
+    load_settings()
     menu()
