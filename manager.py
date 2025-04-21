@@ -3,22 +3,24 @@ import json
 import getpass # gets passwords hidden
 import time
 import os
-# Could even have a file that is like a vimrc where they choose options, such as if password is optional
+from gpg import *
+LINE_BUFFER = "\n\n\n\n"
+
+# generated from https://www.topster.net/text-to-ascii/slant.html
+load_str = r"""
+   __                               __                 
+  / /_  ___    _____   ____ ___    / /__  ___    __  __
+ / __/ / _ \  / ___/  / __ `__ \  / //_/ / _ \  / / / /
+/ /_  /  __/ / /     / / / / / / / ,<   /  __/ / /_/ / 
+\__/  \___/ /_/     /_/ /_/ /_/ /_/|_|  \___/  \__, /  
+                                              /____/ 
+"""
 settings = {}
 
 def load_settings(filepath="settings.json"):
     global settings
     with open(filepath, "r") as f:
         settings = json.load(f)
-
-def secure_remove(filename: str) -> bool:
-    try:
-        subprocess.run(["srm", filename])
-        return True
-    except:
-        print("Failed to secure remove", filename)
-        return False
-    
 
 def get_entry() -> tuple[str, dict[str, str]]:
     info = {}
@@ -96,64 +98,60 @@ def append_to_file() -> None:
 
 def get_passphrase() -> tuple[str, str]:
     while True:
-        passphrase = getpass.getpass("\nEnter a passphrase: ")
+        filename = input("Enter the file you want to manage: ")
+        if os.path.exists(filename):
+            break
+        print("File not found, retry")
+
+    while True:
+        passphrase = getpass.getpass("\nEnter passphrase: ")
         confirm_passphrase = getpass.getpass("Re-enter passphrase to confirm: ")
         if passphrase == confirm_passphrase:
             break
         print("Passphrases differ, retry")
 
-    while True:
-        filename = input("Enter a file to secure (press enter to select \"passwords.json\"): ")
-        if filename == "":
-            filename = "passwords.json"
-        
-        if os.path.exists(filename):
-            break
-        print("File not found, retry")
-
     return filename, passphrase
 
-def gpg_encrypt_file(filepath, passphrase):
-
-    print("Reminder: ensure you have stored the passphrase somewhere safe (e.g. a card that you keep on yourself at all times)")
-    command = [
-        "gpg",
-        "--batch",
-        "--yes",
-        "--quiet",
-        "--pinentry-mode", "loopback",
-        "--passphrase", passphrase,
-        "--cipher-algo", settings["encryptionAlgo"],
-        "-c", filepath
-
-    ]
-    subprocess.run(command, check=True)
-
-    is_srm = input("File successfully encrypted, would you like to securely remove the unencrypted file [y/n]?")
+def prompt_srm(filepath: str) -> None:
+    is_srm = input("Would you like to securely remove the unencrypted file [y/n]? ")
     if is_srm.lower() == 'y':
         secure_remove(filepath)
 
-def gpg_decrypt_file(filepath, passphrase):
-    pass
-
-def gpg_site_info(filepath, passphrase, site):
-    pass # searches the file for the site, if so, returns username and password to user
-
 def print_help():
-    print("\n----- Help -----")
-    print("Required package") # TODO: dependency list (secure-remove, gpg)
-    print("Current settings:", settings) # print settings
+    print("\n----------- Help & Tips -----------")
+    print("In the menu, prefixing a command with \'/\' allows you to run terminal commands. \"/ls\" will list out the current directory. This may have been inspired by Minecraft...")
+    print("\n----------- Required Packages -----------")
+    print("\tsecure-remove\n\tgpg") # TODO: dependency list (secure-remove, gpg)
+    print("\n----------- Current settings -----------") # print settings
+    for k,v in settings.items():
+        print(f"\t{k}: {v}")
+
+    while True:
+        input("\nType anything to exit. ")
+        break
 
 def menu() -> bool:
-    print("\n------- Password Manager Menu -------")
+    print("\n----------- TermKey Menu -----------")
     print("0. Help, Settings, and Dependencies")
     print("1. Create a new file")
     print("2. Add entries to an existing file")
     print("3. Securely store a plaintext file")
-    print("4. Access passwords from encrypted file")
+    print("4. Access passwords from an encrypted file")
 
-    user_option = int(input("Enter an option (-1 to exit): "))
+    user_option = input("Enter an option (-1 to exit): ")
+    if (user_option[0] == '/'):
+        cmd = user_option[1:]
+        print(f"\n> {cmd}")
+        subprocess.run(cmd, shell=True, check=True)
+        time.sleep(0.5)
+        return True
+    
+    user_option = int(user_option)
+    print(LINE_BUFFER)
     match user_option:
+        case -1:
+            print("\nQuitting TermKey...")
+            return False
         case 0:
             print_help()
         case 1:
@@ -164,24 +162,20 @@ def menu() -> bool:
             append_to_file()
         case 3:
             filepath, passphrase = get_passphrase()
-            gpg_encrypt_file(filepath, passphrase)
+            print("Reminder: ensure you have stored the passphrase somewhere safe (e.g. a card that you keep on yourself at all times)")
+            gpg_encrypt_file(filepath, passphrase, settings["encryptionAlgo"])
+        case 4:
+            filepath, passphrase = get_passphrase()
+            json_str = gpg_decrypt_file(filepath, passphrase, settings["encryptionAlgo"])
+            print("OUTPUT CAPTURED")
+            print(json_str)
         case _:
-            print("Quitting password manager")
-            return False
+            print("Invalid option.")
         
     return True
 
 if __name__ == "__main__":
-    print(r"""
-_____________________________________
-  ____ ____ ____    ___/ /__/ /__/ /___
- / ___|  __\   _ \   |  _  \  \/  |
-| |  _| |__ | |_) |  | |_) | |\/| |
-| |_| |  __/   __/   |  __/| |  | |
- \____|_|  | _|      |_|   |_|  |_|
-_/____/_/__/_/_______/_/___/_/__/_/___         
-          PASSWORD MANAGER
-""")
+    print(load_str)
     load_settings()
     while menu():
-        time.sleep(1.5)
+        print(LINE_BUFFER)

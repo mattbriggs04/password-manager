@@ -1,5 +1,5 @@
 {
     "hiddenPassword": true,
-    "autoSecureRemove": true,
+    "autoSecureRemove": false,
     "encryptionAlgo": "AES"
 }

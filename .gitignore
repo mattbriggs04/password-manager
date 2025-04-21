@@ -1,3 +1,4 @@
 !settings.json
 *.json
 *.gpg
+__pycache__
