@@ -35,7 +35,11 @@ def gpg_decrypt_file(filepath: str, passphrase: str, cipher_algo: str) -> dict[s
         "--cipher-algo", cipher_algo,
         "-d", filepath
     ]
-    processObj = subprocess.run(command, check=True, capture_output=True)
+    try:
+        processObj = subprocess.run(command, check=True, capture_output=True)
+    except subprocess.CalledProcessError:
+        print("Password Invalid")
+
     json_dict = json.loads(processObj.stdout.decode('utf-8'))
     return json_dict 
     

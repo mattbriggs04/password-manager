@@ -4,7 +4,8 @@ import getpass # gets passwords hidden
 import time
 import os
 from gpg import *
-LINE_BUFFER = "\n\n\n\n"
+from format import *
+LINE_BUFFER = "\n" * 30
 
 # generated from https://www.topster.net/text-to-ascii/slant.html
 load_str = r"""
@@ -117,12 +118,14 @@ def prompt_srm(filepath: str) -> None:
     if is_srm.lower() == 'y':
         secure_remove(filepath)
 
-def print_help():
-    print("\n----------- Help & Tips -----------")
-    print("In the menu, prefixing a command with \'/\' allows you to run terminal commands. \"/ls\" will list out the current directory. This may have been inspired by Minecraft...")
-    print("\n----------- Required Packages -----------")
-    print("\tsecure-remove\n\tgpg") # TODO: dependency list (secure-remove, gpg)
-    print("\n----------- Current settings -----------") # print settings
+def opt_help():
+    print_header("Help & Tips")
+    print("Tip 1. In the menu, prefixing a command with \'/\' allows you to run terminal commands. \"/ls\" will list out the current directory.")
+    
+    print_header("Required Packages")
+    print("\tsecure-remove\n\tgpg") # TODO: dependency list (secure-remove, gpg
+
+    print_header("Current Settings")
     for k,v in settings.items():
         print(f"\t{k}: {v}")
 
@@ -130,45 +133,61 @@ def print_help():
         input("\nType anything to exit. ")
         break
 
+# Make these wrappers, try to remove all prompt-logic from other functions that serve another purpose
+def opt_encrypt():
+    filepath, passphrase = get_passphrase()
+    gpg_encrypt_file(filepath, passphrase, settings["encryptionAlgo"])
+    print(f"Encrypted {filepath} into {filepath}.gpg")
+
+    if settings["autoSecureRemove"]:
+        res = input("Would you like to remove ")
+
+def opt_append():
+    pass
+
+def opt_decrypt():
+    filepath, passphrase = get_passphrase()
+    json_dict = gpg_decrypt_file(filepath, passphrase, settings["encryptionAlgo"])
+    print("output = ", json_dict)
+
 def menu() -> bool:
-    print("\n----------- TermKey Menu -----------")
+    print_header("TermKey Menu")
     print("0. Help, Settings, and Dependencies")
     print("1. Create a new file")
     print("2. Add entries to an existing file")
     print("3. Securely store a plaintext file")
     print("4. Access passwords from an encrypted file")
 
-    user_option = input("Enter an option (-1 to exit): ")
-    if (user_option[0] == '/'):
-        cmd = user_option[1:]
-        print(f"\n> {cmd}")
-        subprocess.run(cmd, shell=True, check=True)
-        time.sleep(0.5)
-        return True
+    while True:
+        user_option = input("Enter an option (-1 to exit): ")
+        if (user_option and user_option[0] == '/'):
+            cmd = user_option[1:]
+            print(f"\n$ {cmd}")
+            subprocess.run(cmd, shell=True, check=True)
+        else:
+            try:
+                user_option = int(user_option)
+                break
+            except ValueError:
+                print("Invalid option. Not an integer.")
     
-    user_option = int(user_option)
-    print(LINE_BUFFER)
     match user_option:
         case -1:
             print("\nQuitting TermKey...")
             return False
         case 0:
-            print_help()
+            opt_help()
         case 1:
-            print("\n------- Create New File -------")
             create_new_file()
         case 2:
-            print("\n------- Append To File -------")
+            print_header("Append To File")
             append_to_file()
         case 3:
-            filepath, passphrase = get_passphrase()
-            print("Reminder: ensure you have stored the passphrase somewhere safe (e.g. a card that you keep on yourself at all times)")
-            gpg_encrypt_file(filepath, passphrase, settings["encryptionAlgo"])
+            print_header("Encrypt File")
+            opt_encrypt()
         case 4:
-            filepath, passphrase = get_passphrase()
-            json_str = gpg_decrypt_file(filepath, passphrase, settings["encryptionAlgo"])
-            print("OUTPUT CAPTURED")
-            print(json_str)
+            print_header("Decrypt File")
+            opt_decrypt()
         case _:
             print("Invalid option.")
         
