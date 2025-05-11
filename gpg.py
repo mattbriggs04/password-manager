@@ -24,7 +24,7 @@ def gpg_encrypt_file(filepath: str, passphrase: str, cipher_algo: str) -> None:
     subprocess.run(command, check=True)
 
 
-def gpg_decrypt_file(filepath: str, passphrase: str, cipher_algo: str) -> dict[str, str]:
+def gpg_decrypt_file(filepath: str, passphrase: str, cipher_algo: str) -> tuple[dict[str, str], bool]:
     command = [
         "gpg",
         "--batch",
@@ -38,10 +38,10 @@ def gpg_decrypt_file(filepath: str, passphrase: str, cipher_algo: str) -> dict[s
     try:
         processObj = subprocess.run(command, check=True, capture_output=True)
     except subprocess.CalledProcessError:
-        print("Password Invalid")
+        return None, False
 
     json_dict = json.loads(processObj.stdout.decode('utf-8'))
-    return json_dict 
+    return json_dict, True
     
 
 def gpg_site_info(filepath, passphrase, site):

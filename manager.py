@@ -1,7 +1,7 @@
 import subprocess
 import json
 import getpass # gets passwords hidden
-import time
+import re
 import os
 from gpg import *
 from format import *
@@ -97,30 +97,34 @@ def append_to_file() -> None:
         print("Populating file", filename)
         json.dump(obj=json_dict, fp=json_file, indent=4)
 
-def get_passphrase() -> tuple[str, str]:
+def get_filepath() -> str:
     while True:
-        filename = input("Enter the file you want to manage: ")
-        if os.path.exists(filename):
+        filepath = input("Enter the file you want to manage: ")
+        if os.path.exists(filepath) or not filepath:
             break
         print("File not found, retry")
+    return filepath
 
+def get_passphrase(confirm=False) -> tuple[str, str]:
+    input_function = getpass.getpass if settings["hiddenPassword"] else input
     while True:
-        passphrase = getpass.getpass("\nEnter passphrase: ")
-        confirm_passphrase = getpass.getpass("Re-enter passphrase to confirm: ")
+        passphrase = input_function("\nEnter passphrase: ")
+        confirm_passphrase = input_function("Re-enter passphrase to confirm: ")
         if passphrase == confirm_passphrase:
             break
         print("Passphrases differ, retry")
 
-    return filename, passphrase
+    return passphrase
 
-def prompt_srm(filepath: str) -> None:
-    is_srm = input("Would you like to securely remove the unencrypted file [y/n]? ")
-    if is_srm.lower() == 'y':
-        secure_remove(filepath)
+def search_dict(dict, key) -> dict:
+    pass
 
 def opt_help():
     print_header("Help & Tips")
-    print("Tip 1. In the menu, prefixing a command with \'/\' allows you to run terminal commands. \"/ls\" will list out the current directory.")
+    print("\tQ: Why is my password not typing?")
+    print("\tA: Your password is typing! It is just hidden so no one else can see it. This can be turned off in settings.\n")
+
+    print("\tTip: In the menu, prefixing a command with \'/\' allows you to run terminal commands. \"/ls\" will list out the current directory.")
     
     print_header("Required Packages")
     print("\tsecure-remove\n\tgpg") # TODO: dependency list (secure-remove, gpg
@@ -135,20 +139,58 @@ def opt_help():
 
 # Make these wrappers, try to remove all prompt-logic from other functions that serve another purpose
 def opt_encrypt():
-    filepath, passphrase = get_passphrase()
+    filepath = get_filepath()
+    passphrase = get_passphrase(confirm=True)
     gpg_encrypt_file(filepath, passphrase, settings["encryptionAlgo"])
     print(f"Encrypted {filepath} into {filepath}.gpg")
 
     if settings["autoSecureRemove"]:
-        res = input("Would you like to remove ")
+        secure_remove(filepath)
+    else:
+        if input(f"Would you like to securely remove {filepath} [y/n]? ").lower() == "y":
+            secure_remove(filepath)
 
 def opt_append():
     pass
 
 def opt_decrypt():
-    filepath, passphrase = get_passphrase()
-    json_dict = gpg_decrypt_file(filepath, passphrase, settings["encryptionAlgo"])
-    print("output = ", json_dict)
+    filepath = get_filepath()
+    while True:
+        passphrase = get_passphrase()
+        json_dict, is_success = gpg_decrypt_file(filepath, passphrase, settings["encryptionAlgo"])
+        if is_success:
+            break
+
+        print("Incorrect password, try again...\n")
+
+    print("\nFile unlocked. Select an option: ")
+
+    print("0. Print out all stored information")
+    print("1. Print out all site names")
+    print("2. Get a site's credentials")
+
+    user_option = get_user_option("Enter an option (-1 to exit): ")
+
+    match user_option:
+        case -1:
+            return
+        case 0:
+            is_hidden = get_user_option("Would you like the passwords to be hidden [y/n]? ", inp_type=str, commands_allowed=False).lower() == 'y'
+            print_password_dict(json_dict, pwds_hidden=is_hidden)
+        case 1:
+            num = 1
+            for site in json_dict:
+                print(f"{num}. {site}")
+                num += 1
+
+        case 2:
+            site = input("Enter a site to get the information of: ")
+            print_password_dict(json_dict, pwds_hidden=False, sites=[site])
+
+        case _:
+            print("Invalid option")
+    
+    input ("Press enter to exit. ")
 
 def menu() -> bool:
     print_header("TermKey Menu")
@@ -158,18 +200,7 @@ def menu() -> bool:
     print("3. Securely store a plaintext file")
     print("4. Access passwords from an encrypted file")
 
-    while True:
-        user_option = input("Enter an option (-1 to exit): ")
-        if (user_option and user_option[0] == '/'):
-            cmd = user_option[1:]
-            print(f"\n$ {cmd}")
-            subprocess.run(cmd, shell=True, check=True)
-        else:
-            try:
-                user_option = int(user_option)
-                break
-            except ValueError:
-                print("Invalid option. Not an integer.")
+    user_option = get_user_option("Enter an option (-1 to exit): ")
     
     match user_option:
         case -1:
