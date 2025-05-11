@@ -68,6 +68,9 @@ def create_new_file() -> None:
     with open(filename, "w") as json_file:
         print("Populating file", filename)
         json.dump(obj=json_dict, fp=json_file, indent=4)
+    
+    if input("Would you like to secure this file (you can at anytime through the menu) [y/n]? ").lower() == 'y':
+        opt_encrypt()
 
 def get_json_dict(json_file: str):
     if os.path.exists(json_file):
@@ -149,6 +152,7 @@ def opt_encrypt():
     else:
         if input(f"Would you like to securely remove {filepath} [y/n]? ").lower() == "y":
             secure_remove(filepath)
+    input("Success! Press enter to return to menu.")
 
 def opt_append():
     pass
