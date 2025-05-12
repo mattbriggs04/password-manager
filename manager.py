@@ -1,8 +1,11 @@
 import json
 import getpass # gets passwords hidden
 import os
+import re
 from gpg import *
 from format import *
+
+# Used for exiting back to menu and "clearing" the terminal
 LINE_BUFFER = "\n" * 45
 
 # generated from https://www.topster.net/text-to-ascii/slant.html
@@ -15,9 +18,8 @@ load_str = r"""
                                               /____/ 
 """
 
-# global variable to store all user settings, loaded in by load_settings() function
-settings = {}
-pwd_input = getpass.getpass
+settings = {} # global variable to store all of the settings, populated by load_settings()
+pwd_input = getpass.getpass # global variable storing the input function used for passwords (either a hidden function or not-hidden)
 def load_settings(filepath="settings.json"):
     global settings
     with open(filepath, "r") as f:
@@ -44,7 +46,7 @@ def get_entry() -> tuple[str, dict[str, str]]:
     }
     return site, info
 
-def get_entries(json_dict: dict[str, str], sites: set) -> None:
+def add_entries(json_dict: dict[str, str], sites: set) -> None:
     entry_cont_rsp = 'y'
     while entry_cont_rsp.lower() == 'y':
         site, entry = get_entry()
@@ -111,7 +113,6 @@ def opt_help():
         input("\nType anything to exit. ")
         break
 
-# Create a new file and optionally immediately encrypt the file
 def opt_create_new():
     filename = input("Enter a file name (press enter to name file \"passwords.json\"): ")
     if filename == "":
@@ -121,7 +122,7 @@ def opt_create_new():
     entry_cont_rsp = input("Would you like to add one or more entries [y/n]? ")
     if entry_cont_rsp.lower() == 'y':
         sites = set()
-        get_entries(json_dict, sites)
+        add_entries(json_dict, sites)
 
     with open(filename, "w") as json_file:
         print("Creating file", filename)
@@ -132,19 +133,30 @@ def opt_create_new():
 
 def opt_append():
     filename = get_filepath("Enter file to append entries to: ")
+    is_encrypted = False
+    if re.match(r"*.gpg", filename):
+        print(f"{filename} detected as encrypted.")
+        is_encrypted = True
+    elif input(f"Is {filename} encrypted [y/n]? ").lower() == 'y':
+        is_encrypted = True
 
-    json_dict = get_json_dict(filename)
-    sites = set()
-    for k in json_dict.keys():
-        sites.add(k)
-    
-    get_entries(json_dict, sites)
+    if is_encrypted:
+        passphrase = get_passphrase()
+        json_dict = gpg_decrypt_file(filename, passphrase, cipher_algo=settings["cipherAlgo"])
+    else:
+        json_dict = get_json_dict(filename)
 
-    with open(filename, "w") as json_file:
-        print("Populating file", filename)
-        json.dump(obj=json_dict, fp=json_file, indent=4)
-        
-# Make these wrappers, try to remove all prompt-logic from other functions that serve another purpose
+    sites = set(json_dict.keys())
+    add_entries(json_dict, sites)
+
+
+    if not is_encrypted:
+        with open(filename, "w") as json_file:
+            print("Appending entries to", filename)
+            json.dump(obj=json_dict, fp=json_file, indent=4)
+    else:
+        pass # TODO: if encrypted, add to file without gpg, gpg_encrypt(), then srm the file
+
 def opt_encrypt():
     filepath = get_filepath("Enter file you want to encrypt: ")
     passphrase = get_passphrase(confirm=True)
@@ -218,7 +230,7 @@ def menu() -> bool:
             opt_create_new()
         case 2:
             print_header("Append To File")
-            append_to_file()
+            opt_append()
         case 3:
             print_header("Encrypt File")
             opt_encrypt()
