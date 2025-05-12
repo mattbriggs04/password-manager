@@ -6,7 +6,7 @@ import tempfile
 from gpg import *
 from format import *
 
-VERSION = "1.0"
+VERSION = "1.1"
 # Used for exiting back to menu and "clearing" the terminal
 LINE_BUFFER = "\n" * 45
 
@@ -32,7 +32,7 @@ def load_settings(filepath="settings.json"):
 
 def get_entry() -> tuple[str, dict[str, str]]:
     info = {}
-    site = input("\nSite name: ")
+    site = input("Site name: ")
     siteurl = input("Site url (press enter to leave blank): ")
     username = input("Username: ")
 
@@ -163,6 +163,7 @@ def opt_append():
     else:
         json_dict = get_json_dict(filepath)
 
+    print("Add Entries")
     sites = set(json_dict.keys())
     add_entries(json_dict, sites)
 
@@ -190,6 +191,10 @@ def opt_append():
 def opt_encrypt():
     print_header("Encrypt File")
     filepath = get_filepath("Enter file you want to encrypt: ")
+    if not filepath:
+        print("Filepath empty, exiting.")
+        return
+    
     passphrase = get_passphrase(confirm=True)
     gpg_encrypt_file(filepath, passphrase, settings["encryptionAlgo"])
     print(f"Encrypted {filepath} as {filepath}.gpg")
@@ -227,6 +232,7 @@ def opt_decrypt():
             is_hidden = get_user_option("Would you like the passwords to be hidden [y/n]? ", inp_type=str, commands_allowed=False).lower() == 'y'
             print_password_dict(json_dict, pwds_hidden=is_hidden)
         case 1:
+            print("\nSites found:")
             num = 1
             for site in json_dict:
                 print(f"{num}. {site}")
