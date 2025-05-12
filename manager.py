@@ -6,6 +6,7 @@ import tempfile
 from gpg import *
 from format import *
 
+VERSION = "1.0"
 # Used for exiting back to menu and "clearing" the terminal
 LINE_BUFFER = "\n" * 45
 
@@ -35,7 +36,15 @@ def get_entry() -> tuple[str, dict[str, str]]:
     siteurl = input("Site url (press enter to leave blank): ")
     username = input("Username: ")
 
-    password = pwd_input("Password (input hidden): ")
+    while True:
+        password = pwd_input("Password: ")
+        if not settings["hiddenPassword"]:
+            break
+        confirm_password = pwd_input("Confirm Password: ")
+        if password == confirm_password:
+            break
+
+        print("Passwords differ. Try again.")
 
     notes = input("Notes: ") # maybe add multi-line notes allowed
 
@@ -82,7 +91,7 @@ def get_filepath(prompt: str) -> str:
 
 def get_passphrase(confirm=False) -> tuple[str, str]:
     while True:
-        passphrase = pwd_input("\nEnter passphrase: ")
+        passphrase = pwd_input("Enter passphrase: ")
         if not confirm:
             break
 
@@ -95,23 +104,27 @@ def get_passphrase(confirm=False) -> tuple[str, str]:
 
 def opt_help():
     print_header("Help & Tips")
+    print("FAQ:")
     print("\tQ: Why is my password not typing?")
     print("\tA: Your password is typing! It is just hidden so no one else can see it. This can be turned off in settings.\n")
 
-    print("\tTip: In the menu, prefixing a command with \'/\' allows you to run terminal commands. \"/ls\" will list out the current directory.")
+    print("Tips:")
+    print("\t1. In the menu, prefixing a command with \'/\' allows you to run terminal commands. \"/ls\" will list out the current directory.")
     
     print_header("Required Packages")
-    print("\tsecure-remove\n\tgpg") # TODO: dependency list (secure-remove, gpg
+    print("\tsecure-remove")
+    print("\tgpg")
 
     print_header("Current Settings")
     for k,v in settings.items():
         print(f"\t{k}: {v}")
 
     while True:
-        input("\nType anything to exit. ")
+        input("\nPress enter to exit. ")
         break
 
 def opt_create_new():
+    print_header("Create New File")
     filename = input("Enter a file name (press enter to name file \"passwords.json\"): ")
     if filename == "":
         filename = "passwords.json"
@@ -130,27 +143,33 @@ def opt_create_new():
         opt_encrypt()
 
 def opt_append():
-    filename = get_filepath("Enter file to append entries to: ")
+    print_header("Append to File")
+    filepath = get_filepath("Enter file to append entries to: ")
     is_encrypted = False
-    if re.match(r".*\.gpg$", filename):
-        print(f"{filename} detected as encrypted.")
+    if re.match(r".*\.gpg$", filepath):
+        print(f"{filepath} detected as encrypted.")
         is_encrypted = True
-    elif input(f"Is {filename} encrypted [y/n]? ").lower() == 'y':
+    elif input(f"Is {filepath} encrypted [y/n]? ").lower() == 'y':
         is_encrypted = True
 
     if is_encrypted:
-        passphrase = get_passphrase()
-        json_dict = gpg_decrypt_file(filename, passphrase, cipher_algo=settings["cipherAlgo"])
+        while True:
+            passphrase = get_passphrase()
+            json_dict, is_success = gpg_decrypt_file(filepath, passphrase, settings["encryptionAlgo"])
+            if is_success:
+                break
+
+            print("Incorrect password, try again...\n")
     else:
-        json_dict = get_json_dict(filename)
+        json_dict = get_json_dict(filepath)
 
     sites = set(json_dict.keys())
     add_entries(json_dict, sites)
 
 
     if not is_encrypted:
-        with open(filename, "w") as json_file:
-            print("Appending entries to", filename)
+        with open(filepath, "w") as json_file:
+            print("Appending entries to", filepath)
             json.dump(obj=json_dict, fp=json_file, indent=4)
     else:
         try:
@@ -160,8 +179,8 @@ def opt_append():
             json.dump(obj=json_dict, fp=tmp_file, indent=4)
             tmp_file.close()
 
-            gpg_encrypt_file(tmp_path, passphrase, cipher_algo=settings["cipherAlgo"])
-            os.replace(f"{tmp_path}.gpg", filename)
+            gpg_encrypt_file(tmp_path, passphrase, cipher_algo=settings["encryptionAlgo"])
+            os.replace(f"{tmp_path}.gpg", filepath)
         finally:
             # ensure the tmp_path is always securely removed from disk
             secure_remove(tmp_path)
@@ -169,6 +188,7 @@ def opt_append():
     input("Success! Press enter to return to menu.")
 
 def opt_encrypt():
+    print_header("Encrypt File")
     filepath = get_filepath("Enter file you want to encrypt: ")
     passphrase = get_passphrase(confirm=True)
     gpg_encrypt_file(filepath, passphrase, settings["encryptionAlgo"])
@@ -182,6 +202,7 @@ def opt_encrypt():
     input("Success! Press enter to return to menu.")
 
 def opt_decrypt():
+    print_header("Decrypt File")
     filepath = get_filepath("Enter file you want to decrypt: ")
     while True:
         passphrase = get_passphrase()
@@ -237,16 +258,12 @@ def menu() -> bool:
         case 0:
             opt_help()
         case 1:
-            print_header("Create New File")
             opt_create_new()
         case 2:
-            print_header("Append To File")
             opt_append()
         case 3:
-            print_header("Encrypt File")
             opt_encrypt()
         case 4:
-            print_header("Decrypt File")
             opt_decrypt()
         case _:
             print("Invalid option.")
@@ -255,6 +272,7 @@ def menu() -> bool:
 
 if __name__ == "__main__":
     print(load_str)
+    print(f"VERSION {VERSION}")
     load_settings()
     while menu():
         print(LINE_BUFFER)
