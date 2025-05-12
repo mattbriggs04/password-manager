@@ -2,7 +2,7 @@
 This utility expands upon GPG in order to create a simple password manager to run within your CLI, and is more intuitive to follow than memorizing gpg commands. This goal of this password manager was to create a secure password manager that allows the user to easily create and append to a password file that is encrypted and ensure all plaintext data is securely removed off of disk.
 
 ## Install
-Clone this repository, and run `python3 manager.py` in your terminal to run the password manager.
+Clone this repository, and run `python3 manager.py` in your terminal to run the password manager. Eventually, a binary may be added to be placed in your PATH environment variable so one can simply type "termkey" to run the tool.
 
 ## Dependencies
 As of right now, there is no script to enforce dependencies. You will need:
