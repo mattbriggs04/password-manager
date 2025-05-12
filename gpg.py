@@ -21,7 +21,10 @@ def gpg_encrypt_file(filepath: str, passphrase: str, cipher_algo: str) -> None:
         "-c", filepath
 
     ]
-    subprocess.run(command, check=True)
+    try:
+        subprocess.run(command, check=True)
+    except:
+        print(f"Error with encrypting file {filepath}")
 
 
 def gpg_decrypt_file(filepath: str, passphrase: str, cipher_algo: str) -> tuple[dict[str, str], bool]:

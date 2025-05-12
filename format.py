@@ -29,7 +29,7 @@ def print_entry(entry: dict, pwds_hidden=True) -> None:
 
 # Print string in header
 def print_header(header: str) -> None:
-    size = 30
+    size = 45
     print('')
     print(f'{'-'*size}\n{header:^{size}}\n{'-'*size}')
 

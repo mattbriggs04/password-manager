@@ -2,6 +2,7 @@ import json
 import getpass # gets passwords hidden
 import os
 import re
+import tempfile
 from gpg import *
 from format import *
 
@@ -92,9 +93,6 @@ def get_passphrase(confirm=False) -> tuple[str, str]:
 
     return passphrase
 
-def search_dict(dict, key) -> dict:
-    pass
-
 def opt_help():
     print_header("Help & Tips")
     print("\tQ: Why is my password not typing?")
@@ -128,13 +126,13 @@ def opt_create_new():
         print("Creating file", filename)
         json.dump(obj=json_dict, fp=json_file, indent=4)
     
-    if input("Would you like to secure this file (you can anytime through the menu) [y/n]? ").lower() == 'y':
+    if input("Would you like to securely encrypt this file (you can anytime through the menu) [y/n]? ").lower() == 'y':
         opt_encrypt()
 
 def opt_append():
     filename = get_filepath("Enter file to append entries to: ")
     is_encrypted = False
-    if re.match(r"*.gpg", filename):
+    if re.match(r".*\.gpg$", filename):
         print(f"{filename} detected as encrypted.")
         is_encrypted = True
     elif input(f"Is {filename} encrypted [y/n]? ").lower() == 'y':
@@ -155,13 +153,26 @@ def opt_append():
             print("Appending entries to", filename)
             json.dump(obj=json_dict, fp=json_file, indent=4)
     else:
-        pass # TODO: if encrypted, add to file without gpg, gpg_encrypt(), then srm the file
+        try:
+            tmp_file = tempfile.NamedTemporaryFile(mode="w", delete=False)
+            tmp_path = tmp_file.name
+
+            json.dump(obj=json_dict, fp=tmp_file, indent=4)
+            tmp_file.close()
+
+            gpg_encrypt_file(tmp_path, passphrase, cipher_algo=settings["cipherAlgo"])
+            os.replace(f"{tmp_path}.gpg", filename)
+        finally:
+            # ensure the tmp_path is always securely removed from disk
+            secure_remove(tmp_path)
+
+    input("Success! Press enter to return to menu.")
 
 def opt_encrypt():
     filepath = get_filepath("Enter file you want to encrypt: ")
     passphrase = get_passphrase(confirm=True)
     gpg_encrypt_file(filepath, passphrase, settings["encryptionAlgo"])
-    print(f"Encrypted {filepath} into {filepath}.gpg")
+    print(f"Encrypted {filepath} as {filepath}.gpg")
 
     if settings["autoSecureRemove"]:
         secure_remove(filepath)
