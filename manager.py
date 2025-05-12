@@ -1,11 +1,9 @@
-import subprocess
 import json
 import getpass # gets passwords hidden
-import re
 import os
 from gpg import *
 from format import *
-LINE_BUFFER = "\n" * 30
+LINE_BUFFER = "\n" * 45
 
 # generated from https://www.topster.net/text-to-ascii/slant.html
 load_str = r"""
@@ -16,12 +14,17 @@ load_str = r"""
 \__/  \___/ /_/     /_/ /_/ /_/ /_/|_|  \___/  \__, /  
                                               /____/ 
 """
-settings = {}
 
+# global variable to store all user settings, loaded in by load_settings() function
+settings = {}
+pwd_input = getpass.getpass
 def load_settings(filepath="settings.json"):
     global settings
     with open(filepath, "r") as f:
         settings = json.load(f)
+    
+    global pwd_input
+    pwd_input = getpass.getpass if settings["hiddenPassword"] else input
 
 def get_entry() -> tuple[str, dict[str, str]]:
     info = {}
@@ -29,9 +32,9 @@ def get_entry() -> tuple[str, dict[str, str]]:
     siteurl = input("Site url (press enter to leave blank): ")
     username = input("Username: ")
 
-    # if settings['password_hidden']
-    password = getpass.getpass("Password (input hidden): ")
-    notes = input("Additional Notes: ") # maybe add multi-line notes allowed
+    password = pwd_input("Password (input hidden): ")
+
+    notes = input("Notes: ") # maybe add multi-line notes allowed
 
     info = {
         "siteurl": siteurl,
@@ -54,24 +57,6 @@ def get_entries(json_dict: dict[str, str], sites: set) -> None:
             json_dict[site] = entry
         entry_cont_rsp = input("\nWould you like to add another entry [y/n]? ")
 
-def create_new_file() -> None:
-    filename = input("Enter a file name (press enter to name file \"passwords.json\"): ")
-    if filename == "":
-        filename = "passwords.json"
-
-    json_dict = {}
-    entry_cont_rsp = input("Would you like to add one or more entries [y/n]? ")
-    if entry_cont_rsp.lower() == 'y':
-        sites = set()
-        get_entries(json_dict, sites)
-
-    with open(filename, "w") as json_file:
-        print("Populating file", filename)
-        json.dump(obj=json_dict, fp=json_file, indent=4)
-    
-    if input("Would you like to secure this file (you can at anytime through the menu) [y/n]? ").lower() == 'y':
-        opt_encrypt()
-
 def get_json_dict(json_file: str):
     if os.path.exists(json_file):
         with open(json_file, "r") as jf:
@@ -84,35 +69,21 @@ def get_json_dict(json_file: str):
     
     return json_dict
 
-def append_to_file() -> None:
-    filename = input("Enter a file to add an entry to (press enter to name file \"passwords.json\"): ")
-    if filename == "":
-        filename = "passwords.json"
-
-    json_dict = get_json_dict(filename)
-    sites = set()
-    for k in json_dict.keys():
-        sites.add(k)
-    
-    get_entries(json_dict, sites)
-
-    with open(filename, "w") as json_file:
-        print("Populating file", filename)
-        json.dump(obj=json_dict, fp=json_file, indent=4)
-
-def get_filepath() -> str:
+def get_filepath(prompt: str) -> str:
     while True:
-        filepath = input("Enter the file you want to manage: ")
+        filepath = input(prompt)
         if os.path.exists(filepath) or not filepath:
             break
         print("File not found, retry")
     return filepath
 
 def get_passphrase(confirm=False) -> tuple[str, str]:
-    input_function = getpass.getpass if settings["hiddenPassword"] else input
     while True:
-        passphrase = input_function("\nEnter passphrase: ")
-        confirm_passphrase = input_function("Re-enter passphrase to confirm: ")
+        passphrase = pwd_input("\nEnter passphrase: ")
+        if not confirm:
+            break
+
+        confirm_passphrase = pwd_input("Re-enter passphrase to confirm: ")
         if passphrase == confirm_passphrase:
             break
         print("Passphrases differ, retry")
@@ -140,9 +111,42 @@ def opt_help():
         input("\nType anything to exit. ")
         break
 
+# Create a new file and optionally immediately encrypt the file
+def opt_create_new():
+    filename = input("Enter a file name (press enter to name file \"passwords.json\"): ")
+    if filename == "":
+        filename = "passwords.json"
+
+    json_dict = {}
+    entry_cont_rsp = input("Would you like to add one or more entries [y/n]? ")
+    if entry_cont_rsp.lower() == 'y':
+        sites = set()
+        get_entries(json_dict, sites)
+
+    with open(filename, "w") as json_file:
+        print("Creating file", filename)
+        json.dump(obj=json_dict, fp=json_file, indent=4)
+    
+    if input("Would you like to secure this file (you can anytime through the menu) [y/n]? ").lower() == 'y':
+        opt_encrypt()
+
+def opt_append():
+    filename = get_filepath("Enter file to append entries to: ")
+
+    json_dict = get_json_dict(filename)
+    sites = set()
+    for k in json_dict.keys():
+        sites.add(k)
+    
+    get_entries(json_dict, sites)
+
+    with open(filename, "w") as json_file:
+        print("Populating file", filename)
+        json.dump(obj=json_dict, fp=json_file, indent=4)
+        
 # Make these wrappers, try to remove all prompt-logic from other functions that serve another purpose
 def opt_encrypt():
-    filepath = get_filepath()
+    filepath = get_filepath("Enter file you want to encrypt: ")
     passphrase = get_passphrase(confirm=True)
     gpg_encrypt_file(filepath, passphrase, settings["encryptionAlgo"])
     print(f"Encrypted {filepath} into {filepath}.gpg")
@@ -154,11 +158,8 @@ def opt_encrypt():
             secure_remove(filepath)
     input("Success! Press enter to return to menu.")
 
-def opt_append():
-    pass
-
 def opt_decrypt():
-    filepath = get_filepath()
+    filepath = get_filepath("Enter file you want to decrypt: ")
     while True:
         passphrase = get_passphrase()
         json_dict, is_success = gpg_decrypt_file(filepath, passphrase, settings["encryptionAlgo"])
@@ -213,7 +214,8 @@ def menu() -> bool:
         case 0:
             opt_help()
         case 1:
-            create_new_file()
+            print_header("Create New File")
+            opt_create_new()
         case 2:
             print_header("Append To File")
             append_to_file()
